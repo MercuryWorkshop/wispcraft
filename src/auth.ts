@@ -1,34 +1,7 @@
 import encodeQR from "qr";
 import { epoxyFetch } from "./connection/epoxy";
 
-// https://gist.github.com/Plagiatus/ce5f18bc010395fc45d8553905e10f55
-export interface UserInfo {
-	id: string;
-	name: string;
-	skins: SkinInfo[];
-	capes: CapeInfo[];
-}
-export interface AccessoryInfo {
-	id: string;
-	state: "ACTIVE" | "INACTIVE";
-	url: string;
-}
-export interface SkinInfo extends AccessoryInfo {
-	variant: string;
-}
-export interface CapeInfo extends AccessoryInfo {
-	alias: string;
-}
-
 const CLIENT_ID = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
-
-interface OAuthResponse {
-	access_token: string;
-	token_type: string;
-	expires_in: number;
-	scope: string;
-	refresh_token: string;
-}
 
 interface DeviceCodeResponse {
 	device_code: string;
@@ -38,23 +11,21 @@ interface DeviceCodeResponse {
 	interval: number;
 }
 
-type AuthCodeResponse = DeviceCodeResponse & {
-	link_url: string;
-	qr_svg: string;
-	qr_svg_uri: string;
-};
-
-export async function getAuthCodeResponse () {
-	const codeGenerator = await deviceCodeAuth();
-	const linkUrl = "https://microsoft.com/link?otc=" + codeGenerator.code;
-	const qrSvg = encodeQR(linkUrl, "svg", {
-		scale: 6,
-		border: 1,
-	});
-	return { ...codeGenerator, link_url: linkUrl, qr_svg: qrSvg, qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}` }
+interface OAuthResponse {
+	access_token: string;
+	token_type: string;
+	expires_in: number;
+	scope: string;
+	refresh_token: string;
 }
 
-export async function deviceCodeAuth() {
+interface DeviceCodeResult {
+	url: string;
+	code: string;
+	token: Promise<string>;
+}
+
+export async function deviceCodeAuth(): Promise<DeviceCodeResult> {
 	// TOOD: Type
 	const deviceCodeRes = await epoxyFetch(
 		"https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode",
@@ -104,9 +75,7 @@ export async function deviceCodeAuth() {
 			const pollingResponse: TokenPollingResponse = await tokenRes.json();
 
 			if (pollingResponse.access_token) {
-				tokenData = {
-					access_token: pollingResponse.access_token,
-				} as OAuthResponse;
+				tokenData = pollingResponse as OAuthResponse;
 			} else if (pollingResponse.error === "authorization_pending") {
 				// user has not completed the authentication yet; wait for the interval
 				await new Promise((resolve) => setTimeout(resolve, interval * 1000));
@@ -118,6 +87,22 @@ export async function deviceCodeAuth() {
 		return tokenData.access_token;
 	};
 	return { url: verification_uri, code: user_code, token: tokenGenerator() };
+}
+
+type AuthCodeResult = DeviceCodeResult & {
+	link_url: string;
+	qr_svg: string;
+	qr_svg_uri: string;
+};
+
+export async function startDeviceCodeAuth(): Promise<AuthCodeResult> {
+	const codeGenerator = await deviceCodeAuth();
+	const linkUrl = "https://microsoft.com/link?otc=" + codeGenerator.code;
+	const qrSvg = encodeQR(linkUrl, "svg", {
+		scale: 6,
+		border: 1,
+	});
+	return { ...codeGenerator, link_url: linkUrl, qr_svg: qrSvg, qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}` }
 }
 
 async function xboxAuth(msToken: string): Promise<string> {
@@ -242,6 +227,25 @@ export async function checkOwnership(mcToken: string): Promise<boolean> {
 				item.name === "product_minecraft" || item.name === "game_minecraft"
 		) ?? false
 	);
+}
+
+// https://gist.github.com/Plagiatus/ce5f18bc010395fc45d8553905e10f55
+export interface UserInfo {
+	id: string;
+	name: string;
+	skins: SkinInfo[];
+	capes: CapeInfo[];
+}
+export interface AccessoryInfo {
+	id: string;
+	state: "ACTIVE" | "INACTIVE";
+	url: string;
+}
+export interface SkinInfo extends AccessoryInfo {
+	variant: string;
+}
+export interface CapeInfo extends AccessoryInfo {
+	alias: string;
 }
 
 export async function getProfile(mcToken: string): Promise<UserInfo> {

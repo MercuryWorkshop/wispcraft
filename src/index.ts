@@ -1,4 +1,4 @@
-import { getAuthCodeResponse, getProfile, minecraftAuth, UserInfo } from "./auth";
+import { startDeviceCodeAuth, getProfile, minecraftAuth, UserInfo } from "./auth";
 import { epoxyFetch, initWisp } from "./connection/epoxy";
 import { makeFakeWebSocket } from "./connection/fakewebsocket";
 import { showUI } from "./ui";
@@ -88,7 +88,7 @@ if (localStorage["wispcraft_accounts"]) {
 }
 
 export const showSettingsUI = showUI;
-export const getAuthCode = getAuthCodeResponse;
+export const getAuthCode = startDeviceCodeAuth;
 
 // eagler will fetch texture packs, will fail if cors isn't set
 // should really fix this but whatever

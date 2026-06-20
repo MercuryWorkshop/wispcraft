@@ -35,6 +35,18 @@ export async function initWisp(wisp: string) {
 	resolver();
 }
 
+export function set_wisp_server(wisp_url: string) {
+	initpromise = new Promise((r) => (resolver = r));
+	setWispUrl(wisp_url);
+	initWisp(wisp_url);
+}
+
+export async function reconnect() {
+	await initpromise;
+
+	await epoxy!.replace_stream_provider();
+}
+
 export async function epoxyFetch(url: string, opts?: any): Promise<Response> {
 	await initpromise;
 
@@ -63,16 +75,4 @@ export async function connect_tcp(socket: string): Promise<EpoxyIoStream> {
 
 	// create() inits epoxy
 	return await epoxy!.connect_tcp(socket);
-}
-
-export function set_wisp_server(wisp_url: string) {
-	initpromise = new Promise((r) => (resolver = r));
-	setWispUrl(wisp_url);
-	initWisp(wisp_url);
-}
-
-export async function reconnect() {
-	await initpromise;
-
-	await epoxy!.replace_stream_provider();
 }

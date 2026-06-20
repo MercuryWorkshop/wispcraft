@@ -1,7 +1,6 @@
-import { deviceCodeAuth, getAuthCodeResponse, getProfile, minecraftAuth } from "./auth";
+import { startDeviceCodeAuth, getProfile, minecraftAuth } from "./auth";
 import { reconnect, set_wisp_server } from "./connection/epoxy";
 import { authstore, DEFAULT_WISP_URL, getLastUsedAccount, getLoggedInAccounts, TokenStore, wispUrl } from ".";
-import encodeQR from "qr";
 // @ts-ignore
 import workshop from "./img/workshop.png";
 
@@ -519,7 +518,7 @@ export function createUI() {
 	addButton.onclick = async () => {
 		try {
 			addButton.disabled = true;
-			const res = await getAuthCodeResponse();
+			const res = await startDeviceCodeAuth();
 			accountStatus.innerHTML = `Scan QR Code or click <a id="mslink" href="javascript:void(0)" target="_blank">this link</a> and use code <input id="auth_code" class="input" style="width:8em;text-align:center;" type="text" readonly value="${res.code}" /> for logging in.<br /><br />${res.qr_svg}<br />`;
 			const authCodeBox = document.querySelector(
 				"#auth_code"
