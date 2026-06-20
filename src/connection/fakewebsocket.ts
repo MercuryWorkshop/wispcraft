@@ -8,8 +8,8 @@ import { authstore, COMMITHASH, VERSION, wispUrl } from "..";
 import { Buffer } from "../buffer";
 import { showUI } from "../ui";
 import { epoxyWs } from "./epoxy";
-// @ts-ignore typescript sucks
-import wispcraft from "./wispcraft.png";
+// @ts-ignore
+import workshop from "../img/workshop64.png";
 
 class WispWS extends EventTarget {
 	inner: Connection;
@@ -132,7 +132,7 @@ class SettingsWS extends EventTarget {
 					}),
 				})
 			);
-			fetch(wispcraft)
+			fetch(workshop)
 				.then((response) => response.blob())
 				.then((blob) => createImageBitmap(blob))
 				.then((image) => {

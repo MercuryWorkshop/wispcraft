@@ -71,6 +71,16 @@ export class Buffer {
 		this.extend(new Buffer(data));
 	}
 
+	readUByte(): number {
+		const ret = this.get(0);
+		this.take(1);
+		return ret;
+	}
+
+	writeUByte(num: number) {
+		this.extend(new Buffer([num & 0xff]));
+	}
+
 	readUShort(): number {
 		const ret = (this.get(0) << 8) | this.get(1);
 		this.take(2);

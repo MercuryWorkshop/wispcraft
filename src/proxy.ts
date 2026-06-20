@@ -16,12 +16,16 @@ import { joinServer } from "./auth";
 import { VERSION, type AuthStore } from ".";
 // import { authstore } from "./index";
 
-// https://minecraft.wiki/w/Protocol?oldid=2772100
 enum State {
-	Handshaking = 0x0,
-	Status = 0x1,
-	Login = 0x2,
-	Play = 0x3,
+	Handshaking = 0x00,
+	Status = 0x01,
+	Login = 0x02,
+	Play = 0x03,
+}
+
+enum PacketType {
+	Clientbound,
+	Serverbound
 }
 
 // EAG_ prefixed are nonstandard
@@ -39,7 +43,15 @@ enum Serverbound {
 	LoginStart = 0x00,
 	EncryptionResponse = 0x01,
 	/* ==PLAY== */
+	PluginMessage = -0x00,
+}
+
+enum Serverbound_1_8 {
 	PluginMessage = 0x17,
+}
+
+enum Serverbound_1_12 {
+	PluginMessage = 0x09,
 }
 
 enum Clientbound {
@@ -58,10 +70,16 @@ enum Clientbound {
 	SetCompression = 0x03,
 	/* ==PLAY== */
 	SetCompressionPlay = 0x46,
+	PluginMessage = -0x00,
+}
+
+enum Clientbound_1_8 {
 	PluginMessage = 0x3f,
 }
 
-const MINECRAFT_PROTOCOL_VERSION = 47;
+enum Clientbound_1_12 {
+	PluginMessage = 0x18,
+}
 
 class Packet extends Buffer {
 	constructor(packetType: number) {
@@ -99,6 +117,7 @@ const colorMap: { [key: string]: string } = {
 	yellow: "e",
 	white: "f",
 };
+
 function chatToLegacyString(chat: ChatSchema) {
 	let special = "§";
 	let str = "";
@@ -125,6 +144,34 @@ function createEagKick(reason: string): Buffer {
 	return eag;
 }
 
+function createProtocolArray(pvn: number): number[] {
+	if (pvn < 256) {
+		return [0, pvn];
+	} else {
+		return [(pvn >> 8) & 0xff, pvn & 0xff];
+	}
+}
+
+function getVersionPacketId(protocol: number, type: PacketType, packet: string): number {
+	if (type == PacketType.Serverbound) {
+		if (protocol == 47) {
+			return Serverbound_1_8[packet];
+		} else if (protocol == 340) {
+			return Serverbound_1_12[packet];
+		} else {
+			return Serverbound[packet]
+		}
+	} else {
+		if (protocol == 47) {
+			return Clientbound_1_8[packet];
+		} else if (protocol == 340) {
+			return Clientbound_1_12[packet];
+		} else {
+			return Clientbound[packet]
+		}
+	}
+}
+
 export class EaglerProxy {
 	loggedIn: boolean = false;
 	handshook: boolean = false;
@@ -141,6 +188,8 @@ export class EaglerProxy {
 	offlineUsername: string = "";
 	offlineUuid: string = "";
 	isPremium: boolean = false;
+
+	protocol: number = -1;
 
 	constructor(
 		eaglerOut: BytesWriter,
@@ -160,14 +209,20 @@ export class EaglerProxy {
 			case State.Handshaking:
 				switch (packet.readVarInt()) {
 					case Serverbound.EAG_ClientVersion:
+						packet.readUByte();
+						const l = packet.readUShort();
+						for (let i = 0; i < l; i++) {
+							packet.readUShort();
+						}
+						packet.readUShort()
+						this.protocol = packet.readUShort();
 						const fakever = new Packet(Clientbound.EAG_ServerVersion);
 						{
 							const brand = new TextEncoder().encode("Wispcraft");
 							fakever.writeBytes([
 								0,
 								3,
-								0,
-								MINECRAFT_PROTOCOL_VERSION,
+								...createProtocolArray(this.protocol),
 								brand.length,
 							]);
 							fakever.extend(new Buffer(brand));
@@ -199,7 +254,7 @@ export class EaglerProxy {
 						this.state = State.Login;
 
 						let handshake = new Packet(Serverbound.Handshake);
-						handshake.writeVarInt(MINECRAFT_PROTOCOL_VERSION);
+						handshake.writeVarInt(this.protocol);
 						handshake.writeString(this.serverAddress);
 						handshake.writeUShort(this.serverPort);
 						handshake.writeVarInt(State.Login);
@@ -222,7 +277,7 @@ export class EaglerProxy {
 			case State.Play:
 				let pk = packet.readVarInt(false)!;
 				switch (pk) {
-					case Serverbound.PluginMessage:
+					case getVersionPacketId(this.protocol, PacketType.Serverbound, "PluginMessage"):
 						let fard = packet.copy();
 						fard.readVarInt();
 						let tag = fard.readString();
@@ -234,7 +289,7 @@ export class EaglerProxy {
 									if (buf.length == 0) {
 										return;
 									}
-									let resp = new Packet(Clientbound.PluginMessage);
+									let resp = new Packet(getVersionPacketId(this.protocol, PacketType.Clientbound, "PluginMessage"));
 									resp.writeString(tag);
 									resp.extend(buf);
 									this.eagler.write(resp);
@@ -393,12 +448,14 @@ export class EaglerProxy {
 			case State.Play:
 				switch (packet.readVarInt(false)) {
 					case Clientbound.SetCompressionPlay:
-						packet.readVarInt();
-						let threshold = packet.readVarInt();
-						this.decompressor.compressionThresh = threshold;
-						this.compressor.compressionThresh = threshold;
-						break;
-					case Clientbound.PluginMessage:
+						if (this.protocol == 47) {
+							packet.readVarInt();
+							let threshold = packet.readVarInt();
+							this.decompressor.compressionThresh = threshold;
+							this.compressor.compressionThresh = threshold;
+							break;
+						}
+					case getVersionPacketId(this.protocol, PacketType.Clientbound, "PluginMessage"):
 						let pk = packet.copy();
 						pk.readVarInt();
 						let tag = pk.readString();
@@ -415,7 +472,7 @@ export class EaglerProxy {
 	// pings remote server, sends json to eagler
 	async ping() {
 		let handshake = new Packet(Serverbound.Handshake);
-		handshake.writeVarInt(MINECRAFT_PROTOCOL_VERSION);
+		handshake.writeVarInt(47);
 		handshake.writeString(this.serverAddress);
 		handshake.writeUShort(this.serverPort);
 		handshake.writeVarInt(State.Status);

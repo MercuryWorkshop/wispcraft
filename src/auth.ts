@@ -1,3 +1,4 @@
+import encodeQR from "qr";
 import { epoxyFetch } from "./connection/epoxy";
 
 // https://gist.github.com/Plagiatus/ce5f18bc010395fc45d8553905e10f55
@@ -29,6 +30,30 @@ interface OAuthResponse {
 	refresh_token: string;
 }
 
+interface DeviceCodeResponse {
+	device_code: string;
+	user_code: string;
+	verification_uri: string;
+	expires_in: number;
+	interval: number;
+}
+
+type AuthCodeResponse = DeviceCodeResponse & {
+	link_url: string;
+	qr_svg: string;
+	qr_svg_uri: string;
+};
+
+export async function getAuthCodeResponse () {
+	const codeGenerator = await deviceCodeAuth();
+	const linkUrl = "https://microsoft.com/link?otc=" + codeGenerator.code;
+	const qrSvg = encodeQR(linkUrl, "svg", {
+		scale: 6,
+		border: 1,
+	});
+	return { ...codeGenerator, link_url: linkUrl, qr_svg: qrSvg, qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}` }
+}
+
 export async function deviceCodeAuth() {
 	// TOOD: Type
 	const deviceCodeRes = await epoxyFetch(
@@ -44,14 +69,6 @@ export async function deviceCodeAuth() {
 			}).toString(),
 		}
 	);
-
-	interface DeviceCodeResponse {
-		device_code: string;
-		user_code: string;
-		verification_uri: string;
-		expires_in: number;
-		interval: number;
-	}
 
 	const deviceCodeData: DeviceCodeResponse = await deviceCodeRes.json();
 	const { device_code, user_code, verification_uri, interval } = deviceCodeData;

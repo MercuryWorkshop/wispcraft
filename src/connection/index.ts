@@ -1,4 +1,4 @@
-import { EaglerProxy } from "../1.8";
+import { EaglerProxy } from "../proxy";
 import { connect_tcp } from "./epoxy";
 import { epoxyFetch } from "./epoxy";
 import { Buffer } from "../buffer";

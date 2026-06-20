@@ -1,7 +1,9 @@
-import { deviceCodeAuth, getProfile, minecraftAuth } from "./auth";
+import { deviceCodeAuth, getAuthCodeResponse, getProfile, minecraftAuth } from "./auth";
 import { reconnect, set_wisp_server } from "./connection/epoxy";
-import { authstore, TokenStore } from ".";
+import { authstore, DEFAULT_WISP_URL, getLastUsedAccount, getLoggedInAccounts, TokenStore, wispUrl } from ".";
 import encodeQR from "qr";
+// @ts-ignore
+import workshop from "./img/workshop.png";
 
 let keydownListeners: Array<EventListenerOrEventListenerObject> = [];
 const nativeAddEventListener = window.addEventListener;
@@ -212,7 +214,13 @@ export function createUI() {
                 outline: none;
             }
 
-            .settings-ui .button {
+            .settings-ui .action {
+                display: flex;
+                flex-direction: row;
+                gap: 0.5rem;
+            }
+
+            .settings-ui .action .button {
                 background-color: #3C82F6;
                 color: #0F172A;
                 border: 1px solid #1E293B;
@@ -225,13 +233,14 @@ export function createUI() {
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                flex: 1;
             }
 
-            .settings-ui .button:hover {
+            .settings-ui .action .button:hover {
                 background-color: rgba(57 128 242, 0.9);
             }
 
-            .settings-ui .button:focus {
+            .settings-ui .action .button:focus {
                 outline: none;
             }
 
@@ -253,7 +262,6 @@ export function createUI() {
                 width: 148px;
                 height: 148px;
                 transition: all 0.2s ease;
-                cursor: none;
             }
 
             .settings-ui #account_status svg:hover {
@@ -291,7 +299,7 @@ export function createUI() {
         <div class="settings-ui hidden" id="settings_ui">
             <div class="header">
                 <div class="side">
-                    <img src="https://avatars.githubusercontent.com/u/116328501">
+                    <img src="${workshop}">
                     <h1>Wispcraft</h1>
                 </div>
 
@@ -308,7 +316,7 @@ export function createUI() {
             <div class="content shown" id="settings">
                 <div class="setting">
                     <p>Wisp Server</p>
-                    <input class="input" id="wisp_url" placeholder="wss://anura.pro/" />
+                    <input class="input" id="wisp_url" placeholder="${DEFAULT_WISP_URL}" value="${wispUrl}" />
                     <p id="save_status"><br /></p>
                     <p>Microsoft Accounts</p>
                     <select name="accounts" id="account_select" class="select">
@@ -316,8 +324,10 @@ export function createUI() {
                         <option value="no-account">NONE</option>
                     </select>
                     <p id="account_status"></p>
-                    <button class="button" id="addbutton">Add an account</button>
-                    <button class="button" id="removebutton" disabled>Remove account</button>
+                    <div class="action">
+                        <button class="button" id="addbutton">Add an account</button>
+                        <button class="button" id="removebutton" disabled>Remove account</button>
+                    </div>
                 </div>
             </div>
 
@@ -377,15 +387,15 @@ export function createUI() {
 	}
 
 	if (localStorage["wispcraft_accounts"]) {
-		const accounts = JSON.parse(
-			localStorage["wispcraft_accounts"]
-		) as TokenStore[];
-		for (const account of accounts) {
-			const option = document.createElement("option");
-			option.value = account.username;
-			option.innerText = account.username;
-			accountSelect.add(option);
-		}
+        const accounts = getLoggedInAccounts();
+        if (accounts) {
+            for (const account of accounts) {
+                const option = document.createElement("option");
+                option.value = account.username;
+                option.innerText = account.username;
+                accountSelect.add(option);
+            }
+        }
 	}
 
 	if (localStorage["wispcraft_last_used_account"]) {
@@ -457,12 +467,7 @@ export function createUI() {
 			removeButton.disabled = true;
 			return;
 		}
-		const accounts = JSON.parse(
-			localStorage["wispcraft_accounts"]
-		) as TokenStore[];
-		const account = accounts.find(
-			(account) => account.username === accountSelect.value
-		);
+		const account = getLastUsedAccount();
 		if (account) {
 			try {
 				try {
@@ -514,13 +519,8 @@ export function createUI() {
 	addButton.onclick = async () => {
 		try {
 			addButton.disabled = true;
-			const codeGenerator = await deviceCodeAuth();
-			const linkUrl = "https://microsoft.com/link?otc=" + codeGenerator.code;
-			const qrSvg = encodeQR(linkUrl, "svg", {
-				scale: 6,
-				border: 1,
-			});
-			accountStatus.innerHTML = `Scan QR Code or click <a id="mslink" href="javascript:void(0)" target="_blank">this link</a> and use code <input id="auth_code" class="input" style="width:8em;text-align:center;" type="text" readonly value="${codeGenerator.code}" /> for logging in.<br /><br />${qrSvg}<br />`;
+			const res = await getAuthCodeResponse();
+			accountStatus.innerHTML = `Scan QR Code or click <a id="mslink" href="javascript:void(0)" target="_blank">this link</a> and use code <input id="auth_code" class="input" style="width:8em;text-align:center;" type="text" readonly value="${res.code}" /> for logging in.<br /><br />${res.qr_svg}<br />`;
 			const authCodeBox = document.querySelector(
 				"#auth_code"
 			) as HTMLInputElement;
@@ -532,14 +532,14 @@ export function createUI() {
 
 			accountStatus.querySelector<HTMLAnchorElement>("#mslink")!.onclick =
 				async () => {
-					const auth = window.open(linkUrl, "", "height=500,width=350");
-					await codeGenerator.token;
+					const auth = window.open(res.link_url, "", "height=500,width=350");
+					await res.token;
 					auth?.close();
 				};
-			await codeGenerator.token;
+			await res.token;
 			accountStatus.innerHTML = "Authenticating...";
 
-			const token = await codeGenerator.token;
+			const token = await res.token;
 			authstore.msToken = token;
 			authstore.yggToken = await minecraftAuth(authstore.msToken);
 			authstore.user = await getProfile(authstore.yggToken);
