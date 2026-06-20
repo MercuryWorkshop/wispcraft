@@ -52,7 +52,7 @@ try {
 	console.error(e);
 }
 
-export function getLoggedInAccounts (): TokenStore[] | undefined {
+export function getLoggedInAccounts(): TokenStore[] | undefined {
 	const accounts = localStorage["wispcraft_accounts"];
 	if (accounts) {
 		return JSON.parse(accounts) as TokenStore[];
@@ -61,7 +61,7 @@ export function getLoggedInAccounts (): TokenStore[] | undefined {
 	}
 }
 
-export function getLastUsedAccount (): TokenStore | undefined {
+export function getLastUsedAccount(): TokenStore | undefined {
 	const username = localStorage["wispcraft_last_used_account"];
 	const accounts = getLoggedInAccounts();
 	if (username && accounts) {
@@ -90,9 +90,6 @@ if (localStorage["wispcraft_accounts"]) {
 export const showSettingsUI = showUI;
 export const getAuthCode = getAuthCodeResponse;
 
-// replace websocket with our own
-window.WebSocket = makeFakeWebSocket();
-
 // eagler will fetch texture packs, will fail if cors isn't set
 // should really fix this but whatever
 window.fetch = async function (url: RequestInfo | URL, init?: RequestInit) {
@@ -102,6 +99,9 @@ window.fetch = async function (url: RequestInfo | URL, init?: RequestInit) {
 		return await epoxyFetch("" + url, init);
 	}
 };
+
+// replace websocket with our own
+window.WebSocket = makeFakeWebSocket();
 
 type EaglerXOptions = any;
 let eagoptions: EaglerXOptions;

@@ -592,4 +592,5 @@ export function showUI() {
 	}
 	settingsUi.classList.remove("hidden");
 	document.querySelector(".backdrop-blur")!.classList.remove("hidden");
+    document.exitFullscreen().catch(() => {});
 }
