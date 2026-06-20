@@ -102,7 +102,12 @@ export async function startDeviceCodeAuth(): Promise<AuthCodeResult> {
 		scale: 6,
 		border: 1,
 	});
-	return { ...codeGenerator, link_url: linkUrl, qr_svg: qrSvg, qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}` }
+	return {
+		...codeGenerator,
+		link_url: linkUrl,
+		qr_svg: qrSvg,
+		qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}`,
+	};
 }
 
 async function xboxAuth(msToken: string): Promise<string> {

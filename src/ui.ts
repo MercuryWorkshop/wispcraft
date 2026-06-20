@@ -1,6 +1,13 @@
 import { startDeviceCodeAuth, getProfile, minecraftAuth } from "./auth";
 import { reconnect, set_wisp_server } from "./connection/epoxy";
-import { authstore, DEFAULT_WISP_URL, getLastUsedAccount, getLoggedInAccounts, TokenStore, wispUrl } from ".";
+import {
+	authstore,
+	DEFAULT_WISP_URL,
+	getLastUsedAccount,
+	getLoggedInAccounts,
+	TokenStore,
+	wispUrl,
+} from ".";
 // @ts-ignore
 import workshop from "./img/workshop.png";
 
@@ -386,15 +393,15 @@ export function createUI() {
 	}
 
 	if (localStorage["wispcraft_accounts"]) {
-        const accounts = getLoggedInAccounts();
-        if (accounts) {
-            for (const account of accounts) {
-                const option = document.createElement("option");
-                option.value = account.username;
-                option.innerText = account.username;
-                accountSelect.add(option);
-            }
-        }
+		const accounts = getLoggedInAccounts();
+		if (accounts) {
+			for (const account of accounts) {
+				const option = document.createElement("option");
+				option.value = account.username;
+				option.innerText = account.username;
+				accountSelect.add(option);
+			}
+		}
 	}
 
 	if (localStorage["wispcraft_last_used_account"]) {
@@ -591,5 +598,5 @@ export function showUI() {
 	}
 	settingsUi.classList.remove("hidden");
 	document.querySelector(".backdrop-blur")!.classList.remove("hidden");
-    document.exitFullscreen().catch(() => {});
+	document.exitFullscreen().catch(() => {});
 }
