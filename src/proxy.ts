@@ -54,6 +54,10 @@ enum Serverbound_1_12 {
 	PluginMessage = 0x09,
 }
 
+enum Serverbound_1_15 {
+	PluginMessage = 0x0B,
+}
+
 enum Clientbound {
 	/* ==HANDSHAKING== */
 	EAG_ServerVersion = 0x02,
@@ -79,6 +83,10 @@ enum Clientbound_1_8 {
 
 enum Clientbound_1_12 {
 	PluginMessage = 0x18,
+}
+
+enum Clientbound_1_15 {
+	PluginMessage = 0x19,
 }
 
 class Packet extends Buffer {
@@ -162,6 +170,8 @@ function getVersionPacketId(
 			return Serverbound_1_8[packet];
 		} else if (protocol == 340) {
 			return Serverbound_1_12[packet];
+		} else if (protocol == 578) {
+			return Serverbound_1_15[packet];
 		} else {
 			return Serverbound[packet];
 		}
@@ -170,6 +180,8 @@ function getVersionPacketId(
 			return Clientbound_1_8[packet];
 		} else if (protocol == 340) {
 			return Clientbound_1_12[packet];
+		} else if (protocol == 578) {
+			return Clientbound_1_15[packet];
 		} else {
 			return Clientbound[packet];
 		}
