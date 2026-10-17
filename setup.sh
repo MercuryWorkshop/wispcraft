@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+set -euo pipefail
+
 rm -rf dist
 mkdir -p dist
 npm run build

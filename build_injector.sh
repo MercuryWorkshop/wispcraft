@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+set -euo pipefail
 
 BASE64BUNDLE="return '$(base64 dist/index.js)'"
 VERSION="$(grep version package.json | sed -e 's/..version....//g' -e 's/...$//g')"
