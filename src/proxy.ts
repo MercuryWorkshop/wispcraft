@@ -1,3 +1,5 @@
+import { VERSION } from "./consts";
+import { type AuthStore } from ".";
 import { Buffer } from "./buffer";
 import { BytesWriter, Compressor, Decompressor } from "./connection/framer";
 import {
@@ -13,8 +15,6 @@ import {
 import { handleSkinCape } from "./skins";
 import "./auth";
 import { joinServer } from "./auth";
-import { VERSION, type AuthStore } from ".";
-// import { authstore } from "./index";
 
 enum State {
 	Handshaking = 0x00,

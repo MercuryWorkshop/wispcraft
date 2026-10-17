@@ -3,8 +3,9 @@ import {
 	EpoxyWebSocket,
 	EpoxyWebSocketInput,
 } from "@mercuryworkshop/epoxy-tls";
+import { COMMITHASH, VERSION } from "../consts";
 import { Connection } from ".";
-import { authstore, COMMITHASH, VERSION, wispUrl } from "..";
+import { authstore, wispUrl } from "..";
 import { Buffer } from "../buffer";
 import { showUI } from "../ui";
 import { epoxyWs } from "./epoxy";

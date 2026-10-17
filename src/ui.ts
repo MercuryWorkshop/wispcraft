@@ -1,13 +1,13 @@
-import { startDeviceCodeAuth, getProfile, minecraftAuth } from "./auth";
-import { reconnect, set_wisp_server } from "./connection/epoxy";
+import { DEFAULT_WISP_URL } from "./consts";
 import {
 	authstore,
-	DEFAULT_WISP_URL,
 	getLastUsedAccount,
 	getLoggedInAccounts,
 	TokenStore,
 	wispUrl,
 } from ".";
+import { startDeviceCodeAuth, getProfile, minecraftAuth } from "./auth";
+import { reconnect, set_wisp_server } from "./connection/epoxy";
 // @ts-ignore
 import workshop from "./img/workshop.png";
 

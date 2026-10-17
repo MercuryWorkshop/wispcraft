@@ -1,3 +1,4 @@
+import { DEFAULT_WISP_URL } from "./consts";
 import {
 	startDeviceCodeAuth,
 	getProfile,
@@ -8,14 +9,11 @@ import { epoxyFetch, initWisp } from "./connection/epoxy";
 import { makeFakeWebSocket } from "./connection/fakewebsocket";
 import { showUI } from "./ui";
 
-//@ts-expect-error this gets filled in by rollup
-export const VERSION = self.VERSION;
-//@ts-expect-error this too
-export const COMMITHASH = self.COMMITHASH;
-
-export const DEFAULT_WISP_URL = "wss://anura.pro/";
-
-export let wispUrl: string;
+export let wispUrl: string =
+	((window as any).anura && (window as any).anura.wsproxyURL) ||
+	new URL(window.location.href).searchParams.get("wisp") ||
+	localStorage["wispcraft_wispurl"] ||
+	DEFAULT_WISP_URL;
 
 export type AuthStore = {
 	user: UserInfo | null;
@@ -35,8 +33,6 @@ export let authstore: AuthStore = {
 	msToken: "",
 };
 
-const nativeFetch = fetch;
-
 export function setWispUrl(wisp: string) {
 	const wispUrlUrl = new URL(wisp);
 	if (!wispUrlUrl.pathname.endsWith("/")) {
@@ -44,12 +40,6 @@ export function setWispUrl(wisp: string) {
 	}
 	wispUrl = wispUrlUrl.href;
 }
-
-wispUrl =
-	((window as any).anura && (window as any).anura.wsproxyURL) ||
-	new URL(window.location.href).searchParams.get("wisp") ||
-	localStorage["wispcraft_wispurl"] ||
-	DEFAULT_WISP_URL;
 
 try {
 	setWispUrl(wispUrl);
@@ -95,6 +85,7 @@ if (localStorage["wispcraft_accounts"]) {
 export const showSettingsUI = showUI;
 export const getAuthCode = startDeviceCodeAuth;
 
+const nativeFetch = fetch;
 // eagler will fetch texture packs, will fail if cors isn't set
 // should really fix this but whatever
 window.fetch = async function (url: RequestInfo | URL, init?: RequestInit) {
