@@ -3,7 +3,8 @@ import {
 	authstore,
 	getLastUsedAccount,
 	getLoggedInAccounts,
-	TokenStore,
+	restoreAccount,
+	saveAccount,
 	wispUrl,
 } from ".";
 import { startDeviceCodeAuth, getProfile, minecraftAuth } from "./auth";
@@ -476,15 +477,8 @@ export function createUI() {
 		const account = getLastUsedAccount();
 		if (account) {
 			try {
-				try {
-					authstore.msToken = account.ms;
-					authstore.yggToken = account.token;
-					authstore.user = await getProfile(authstore.yggToken);
-				} catch (e) {
-					authstore.yggToken = await minecraftAuth(authstore.msToken);
-					authstore.user = await getProfile(authstore.yggToken);
-				}
-				localStorage["wispcraft_last_used_account"] = authstore.user.name;
+				await restoreAccount(account);
+				localStorage["wispcraft_last_used_account"] = authstore.user!.name;
 				removeButton.disabled = false;
 				return;
 			} catch (e) {
@@ -539,37 +533,21 @@ export function createUI() {
 			accountStatus.querySelector<HTMLAnchorElement>("#mslink")!.onclick =
 				async () => {
 					const auth = window.open(res.link_url, "", "height=500,width=350");
-					await res.token;
+					await res.tokens;
 					auth?.close();
 				};
-			await res.token;
+			const tokens = await res.tokens;
 			accountStatus.innerHTML = "Authenticating...";
-
-			const token = await res.token;
-			authstore.msToken = token;
+			authstore.msToken = tokens.access;
+			authstore.msRefresh = tokens.refresh;
 			authstore.yggToken = await minecraftAuth(authstore.msToken);
 			authstore.user = await getProfile(authstore.yggToken);
-			const localAuthStore = localStorage["wispcraft_accounts"];
-			const newAccEntry = {
+			saveAccount({
 				username: authstore.user.name,
-				token: authstore.yggToken,
 				ms: authstore.msToken,
-			} as TokenStore;
-			if (!localAuthStore) {
-				localStorage["wispcraft_accounts"] = JSON.stringify([newAccEntry]);
-			} else {
-				const accounts = JSON.parse(localAuthStore);
-				const existingAccount = accounts.findIndex(
-					(account: { username: string | undefined }) =>
-						account.username === authstore.user?.name
-				);
-				if (existingAccount != -1) {
-					accounts.splice(existingAccount, 1, newAccEntry);
-				} else {
-					accounts.push(newAccEntry);
-				}
-				localStorage["wispcraft_accounts"] = JSON.stringify(accounts);
-			}
+				refresh: authstore.msRefresh,
+				token: authstore.yggToken,
+			});
 			const selector = document.createElement("option");
 			selector.value = authstore.user.name;
 			selector.innerText = authstore.user.name;

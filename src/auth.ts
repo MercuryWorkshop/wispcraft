@@ -19,14 +19,37 @@ interface OAuthResponse {
 	refresh_token: string;
 }
 
+export interface MsTokens {
+	access: string;
+	refresh: string;
+}
+
 interface DeviceCodeResult {
 	url: string;
 	code: string;
-	token: Promise<string>;
+	tokens: Promise<MsTokens>;
+}
+
+// https://gist.github.com/Plagiatus/ce5f18bc010395fc45d8553905e10f55
+export interface UserInfo {
+	id: string;
+	name: string;
+	skins: SkinInfo[];
+	capes: CapeInfo[];
+}
+export interface AccessoryInfo {
+	id: string;
+	state: "ACTIVE" | "INACTIVE";
+	url: string;
+}
+export interface SkinInfo extends AccessoryInfo {
+	variant: string;
+}
+export interface CapeInfo extends AccessoryInfo {
+	alias: string;
 }
 
 export async function deviceCodeAuth(): Promise<DeviceCodeResult> {
-	// TOOD: Type
 	const deviceCodeRes = await epoxyFetch(
 		"https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode",
 		{
@@ -84,9 +107,14 @@ export async function deviceCodeAuth(): Promise<DeviceCodeResult> {
 			}
 		}
 
-		return tokenData.access_token;
+		return { access: tokenData.access_token, refresh: tokenData.refresh_token };
 	};
-	return { url: verification_uri, code: user_code, token: tokenGenerator() };
+	const tokens = tokenGenerator();
+	return {
+		url: verification_uri,
+		code: user_code,
+		tokens,
+	};
 }
 
 type AuthCodeResult = DeviceCodeResult & {
@@ -107,6 +135,33 @@ export async function startDeviceCodeAuth(): Promise<AuthCodeResult> {
 		link_url: linkUrl,
 		qr_svg: qrSvg,
 		qr_svg_uri: `data:image/svg+xml;base64,${btoa(qrSvg)}`,
+	};
+}
+
+export async function refreshMsToken(refreshToken: string): Promise<MsTokens> {
+	const res = await epoxyFetch(
+		"https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded",
+			},
+			body: new URLSearchParams({
+				client_id: CLIENT_ID,
+				grant_type: "refresh_token",
+				refresh_token: refreshToken,
+				scope: "XboxLive.signin offline_access",
+			}).toString(),
+		}
+	);
+	const json = await res.json();
+	if (!json["access_token"])
+		throw new Error(`refreshing ms token failed: ${json["error"]}`);
+
+	// microsoft may rotate the refresh token, so keep the old one if it doesn't
+	return {
+		access: json["access_token"],
+		refresh: json["refresh_token"] || refreshToken,
 	};
 }
 
@@ -216,6 +271,12 @@ async function mcAuth(xstsToken: string, xstsHash: string): Promise<string> {
 	return token;
 }
 
+export async function minecraftAuth(msToken: string): Promise<string> {
+	const xboxToken = await xboxAuth(msToken);
+	const xstsInfo = await xstsAuth(xboxToken);
+	return mcAuth(xstsInfo.token, xstsInfo.userHash);
+}
+
 export async function checkOwnership(mcToken: string): Promise<boolean> {
 	const res = await epoxyFetch(
 		"https://api.minecraftservices.com/entitlements/mcstore",
@@ -234,25 +295,6 @@ export async function checkOwnership(mcToken: string): Promise<boolean> {
 	);
 }
 
-// https://gist.github.com/Plagiatus/ce5f18bc010395fc45d8553905e10f55
-export interface UserInfo {
-	id: string;
-	name: string;
-	skins: SkinInfo[];
-	capes: CapeInfo[];
-}
-export interface AccessoryInfo {
-	id: string;
-	state: "ACTIVE" | "INACTIVE";
-	url: string;
-}
-export interface SkinInfo extends AccessoryInfo {
-	variant: string;
-}
-export interface CapeInfo extends AccessoryInfo {
-	alias: string;
-}
-
 export async function getProfile(mcToken: string): Promise<UserInfo> {
 	const res = await epoxyFetch(
 		"https://api.minecraftservices.com/minecraft/profile",
@@ -269,29 +311,20 @@ export async function getProfile(mcToken: string): Promise<UserInfo> {
 	return json;
 }
 
-export async function minecraftAuth(msToken: string): Promise<string> {
-	const xboxToken = await xboxAuth(msToken);
-	const xstsInfo = await xstsAuth(xboxToken);
-	return mcAuth(xstsInfo.token, xstsInfo.userHash);
-}
-
 export async function joinServer(
 	mcToken: string,
-	digest: string,
-	uuid: string
+	uuid: string,
+	digest: string
 ) {
-	const res = await epoxyFetch(
-		"https://sessionserver.mojang.com/session/minecraft/join",
-		{
-			headers: {
-				"Content-Type": "application/json",
-			},
-			method: "POST",
-			body: JSON.stringify({
-				selectedProfile: uuid,
-				serverId: digest,
-				accessToken: mcToken,
-			}),
-		}
-	);
+	await epoxyFetch("https://sessionserver.mojang.com/session/minecraft/join", {
+		headers: {
+			"Content-Type": "application/json",
+		},
+		method: "POST",
+		body: JSON.stringify({
+			accessToken: mcToken,
+			selectedProfile: uuid,
+			serverId: digest,
+		}),
+	});
 }

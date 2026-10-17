@@ -3,6 +3,7 @@ import {
 	startDeviceCodeAuth,
 	getProfile,
 	minecraftAuth,
+	refreshMsToken,
 	UserInfo,
 } from "./auth";
 import { epoxyFetch, initWisp } from "./connection/epoxy";
@@ -17,20 +18,24 @@ export let wispUrl: string =
 
 export type AuthStore = {
 	user: UserInfo | null;
-	yggToken: string;
 	msToken: string;
+	msRefresh: string;
+	yggToken: string;
 };
 
 export type TokenStore = {
 	username: string;
 	token: string;
 	ms: string;
+	// missing on accounts saved before refresh tokens were stored
+	refresh?: string;
 };
 
 export let authstore: AuthStore = {
 	user: null,
-	yggToken: "",
 	msToken: "",
+	msRefresh: "",
+	yggToken: "",
 };
 
 export function setWispUrl(wisp: string) {
@@ -66,19 +71,52 @@ export function getLastUsedAccount(): TokenStore | undefined {
 	}
 }
 
+export function saveAccount(entry: TokenStore) {
+	const accounts = getLoggedInAccounts() || [];
+	const existingAccount = accounts.findIndex(
+		(account) => account.username === entry.username
+	);
+	if (existingAccount != -1) {
+		accounts.splice(existingAccount, 1, entry);
+	} else {
+		accounts.push(entry);
+	}
+	localStorage["wispcraft_accounts"] = JSON.stringify(accounts);
+}
+
+// load a saved account into authstore, falling back to the ms token and then
+// the refresh token as each one expires
+export async function restoreAccount(account: TokenStore) {
+	authstore.msToken = account.ms;
+	authstore.msRefresh = account.refresh || "";
+	authstore.yggToken = account.token;
+	try {
+		authstore.user = await getProfile(authstore.yggToken);
+		return;
+	} catch (e) {}
+
+	try {
+		authstore.yggToken = await minecraftAuth(authstore.msToken);
+	} catch (e) {
+		if (!authstore.msRefresh) throw e;
+		const tokens = await refreshMsToken(authstore.msRefresh);
+		authstore.msToken = tokens.access;
+		authstore.msRefresh = tokens.refresh;
+		authstore.yggToken = await minecraftAuth(authstore.msToken);
+	}
+	authstore.user = await getProfile(authstore.yggToken);
+	saveAccount({
+		username: authstore.user.name,
+		token: authstore.yggToken,
+		ms: authstore.msToken,
+		refresh: authstore.msRefresh || undefined,
+	});
+}
+
 if (localStorage["wispcraft_accounts"]) {
 	const account = getLastUsedAccount();
 	if (account) {
-		(async () => {
-			try {
-				authstore.msToken = account.ms;
-				authstore.yggToken = account.token;
-				authstore.user = await getProfile(authstore.yggToken);
-			} catch (e) {
-				authstore.yggToken = await minecraftAuth(authstore.msToken);
-				authstore.user = await getProfile(authstore.yggToken);
-			}
-		})();
+		restoreAccount(account).catch(console.error);
 	}
 }
 

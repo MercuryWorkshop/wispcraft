@@ -442,8 +442,8 @@ export class EaglerProxy {
 							);
 							await joinServer(
 								this.authStore.yggToken,
-								digest,
-								this.authStore.user.id
+								this.authStore.user.id,
+								digest
 							);
 
 							let response = new Packet(Serverbound.EncryptionResponse);
